@@ -1,0 +1,29 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_Auto]
+@="Transcribe (Auto)"
+"Icon"="C:\\Tools\\FasterWhisperTranscribe\\faster-whisper-xxl.exe"
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_Auto\command]
+@="\"C:\\Tools\\FasterWhisperTranscribe\\fw_auto.cmd\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_DE]
+@="Transcribe (DE)"
+"Icon"="C:\\Tools\\FasterWhisperTranscribe\\faster-whisper-xxl.exe"
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_DE\command]
+@="\"C:\\Tools\\FasterWhisperTranscribe\\fw_de.cmd\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_EN]
+@="Transcribe (EN)"
+"Icon"="C:\\Tools\\FasterWhisperTranscribe\\faster-whisper-xxl.exe"
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_EN\command]
+@="\"C:\\Tools\\FasterWhisperTranscribe\\fw_en.cmd\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_SPK]
+@="Transcribe + Speakers"
+"Icon"="C:\\Tools\\FasterWhisperTranscribe\\faster-whisper-xxl.exe"
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_SPK\command]
+@="\"C:\\Tools\\FasterWhisperTranscribe\\fw_speakers.cmd\" \"%1\""
