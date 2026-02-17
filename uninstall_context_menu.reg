@@ -1,0 +1,6 @@
+Windows Registry Editor Version 5.00
+
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_Auto]
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_DE]
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_EN]
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\FWXXL_SPK]
