@@ -22,7 +22,8 @@ const list = (value, valid, limit = 100) => Array.isArray(value) && value.length
   value.length <= limit && [...value].every(valid) && new Set(value).size === value.length;
 const repository = value => matches(value, REPOSITORY) &&
   !value.split('/').some(part => part === '.' || part === '..' || part.endsWith('.git'));
-const baseBranchName = value => text(value, 255) && matches(value, BRANCH) && !value.includes('..');
+const baseBranchName = value => text(value, 255) && matches(value, BRANCH) && !value.includes('..') &&
+  value.split('/').every(part => part && !part.startsWith('.') && !part.endsWith('.lock'));
 const repositories = policy => object(policy) && list(policy.allowedRepositories, repository);
 const allowedPaths = policy => object(policy) && list(policy.allowedPaths,
   value => safePath(value) && !/[!*?\[\]{}]/.test(value), MAX_FILES);
@@ -161,3 +162,4 @@ export function mergeEligibility(snapshot, policy, nowMs) {
     ? { eligible: false, reason: 'waiting_one_hour', eligibleAtMs }
     : { eligible: true, eligibleAtMs };
 }
+

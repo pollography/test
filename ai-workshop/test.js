@@ -172,6 +172,12 @@ test('invalid or missing policy.baseBranch blocks merge eligibility', () => {
   }
 });
 
+test('merge rejects invalid Git ref components even when policy and snapshot agree', () => {
+  for (const baseBranch of ['feature//target', 'feature/.hidden/target', 'feature.lock/target', 'main.lock']) {
+    assert.equal(mergeEligibility({ ...snapshot(), baseBranch }, { ...POLICY, baseBranch }, NOW).reason, 'invalid_policy', baseBranch);
+  }
+});
+
 test('merge passes at exactly 3600 seconds, never one millisecond early', () => {
   const input = snapshot();
   assert.deepEqual(mergeEligibility(input, POLICY, NOW), { eligible: true, eligibleAtMs: NOW });
@@ -365,3 +371,4 @@ test('both functions leave caller data unchanged and do not consult wall-clock s
   assert.deepEqual(first, second);
   assert.deepEqual([inputEvent, inputSnapshot, POLICY], originals);
 });
+
