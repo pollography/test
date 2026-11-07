@@ -1,0 +1,35 @@
+---
+description: Project-only pstack model routing within the existing included Composer budget
+alwaysApply: true
+---
+# pstack model configuration for this repository only.
+# Source: cursor/plugins/pstack/skills/setup-pstack/SKILL.md.
+# Use the documented inherit-parent alias: omit Task model, inherit parent.
+# Parent must be Composer 2.5 with Fast OFF; never select a paid fallback.
+# No user-global model rule is written by this project configuration.
+# budget: small (medium target; aliases retain the parent's supported settings)
+feature, refactoring: inherit-parent
+bug-fix: inherit-parent
+perf-issue: inherit-parent
+hillclimb: inherit-parent
+judgment and prose: inherit-parent
+hardest tasks: inherit-parent
+how explorer: inherit-parent
+how explainer: inherit-parent
+why investigators: inherit-parent
+why synthesizer: inherit-parent
+reflect tooling: inherit-parent
+reflect judgment, divergent, synthesizer: inherit-parent
+arena runners: inherit-parent, inherit-parent
+arena cross-judge pool: inherit-parent
+swarm workers: inherit-parent
+architect runners: inherit-parent, inherit-parent
+interrogate reviewers: inherit-parent, inherit-parent
+
+Run poteto-mode in the top-level Cloud Agent, not inside one nested routing
+agent: the parent owns Task fan-out and its todo list. No subagent receives
+Slack credentials or posts to Slack. Report unsupported tools explicitly.
+An Arena cross-family judge is unavailable within this inherited-model-only
+policy; skip that operation with a reason instead of selecting another model.
+Two-entry panels are two independent roles on the inherited model, not a
+claim of different model families or independent provider assurance.
