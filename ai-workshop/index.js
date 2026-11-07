@@ -9,6 +9,7 @@ const TEAM = /^T[A-Z0-9]{2,63}$/;
 const CHANNEL = /^[CG][A-Z0-9]{2,63}$/;
 const ACTOR = /^[UW][A-Z0-9]{2,63}$/;
 const REPOSITORY = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,38}\/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/;
+const BRANCH = /^[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9])?$/;
 
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const timestamp = value => Number.isSafeInteger(value) && value >= 0;
@@ -21,6 +22,7 @@ const list = (value, valid, limit = 100) => Array.isArray(value) && value.length
   value.length <= limit && [...value].every(valid) && new Set(value).size === value.length;
 const repository = value => matches(value, REPOSITORY) &&
   !value.split('/').some(part => part === '.' || part === '..' || part.endsWith('.git'));
+const baseBranchName = value => text(value, 255) && matches(value, BRANCH) && !value.includes('..');
 const repositories = policy => object(policy) && list(policy.allowedRepositories, repository);
 const allowedPaths = policy => object(policy) && list(policy.allowedPaths,
   value => safePath(value) && !/[!*?\[\]{}]/.test(value), MAX_FILES);
@@ -94,10 +96,14 @@ function excludedPath(value) {
 /** Evaluate caller-supplied fresh evidence. Does not merge, authenticate or enforce permissions. */
 export function mergeEligibility(snapshot, policy, nowMs) {
   if (!timestamp(nowMs)) return blocked('invalid_now_ms');
-  if (!repositories(policy) || !allowedPaths(policy) || !list(policy.requiredChecks, value => text(value, 100), 50)) {
+  if (!repositories(policy) || !allowedPaths(policy) || !list(policy.requiredChecks, value => text(value, 100), 50) ||
+      !baseBranchName(policy.baseBranch)) {
     return blocked('invalid_policy');
   }
   if (!object(snapshot)) return blocked('invalid_snapshot');
+  if (!Object.hasOwn(snapshot, 'baseBranch')) return blocked('missing_base_branch');
+  if (!baseBranchName(snapshot.baseBranch)) return blocked('invalid_base_branch');
+  if (snapshot.baseBranch !== policy.baseBranch) return blocked('base_branch_mismatch');
   if (!repository(snapshot.repository) || !policy.allowedRepositories.includes(snapshot.repository) ||
       snapshot.headRepository !== snapshot.repository) return blocked('repository_not_allowed');
   if (!Number.isSafeInteger(snapshot.pullRequestNumber) || snapshot.pullRequestNumber <= 0 ||

@@ -16,6 +16,7 @@ const policy = {
   repository: 'pollography/test', allowedRepositories: ['pollography/test'],
   allowedPaths: ['src/counter.js', 'src/new.js', 'src/old.js'],
   requiredChecks: ['test', 'lint'],
+  baseBranch: 'main',
 };
 const result = normalizeSlackEvent({
   type: 'event_callback', team_id: 'TDEMO0001',
@@ -42,11 +43,14 @@ Normalisiertes Event: `source`, `idempotencyKey`, `teamId`, `channelId`, `actorI
 | --- | --- |
 | `repository`, `headRepository` | Exakter Allowlist-Treffer; im Pilot gleicher Quell-/Ziel-Owner und Repository, keine Forks |
 | `pullRequestNumber`, `state` | Positive sichere Integer-ID, Zustand `open` |
+| `baseBranch` | Muss exakt `policy.baseBranch` entsprechen; fehlend, ungültig oder abweichend blockiert |
 | `draft`, `conflicts`, `veto`, `changeRequested` | Alle explizit `false`; fehlend oder unbekannt blockiert |
 | `headSha`, `testedHeadSha`, `headUpdatedAtMs` | Identische volle 40-stellige kleingeschriebene SHA; Zeit des aktuellen Heads |
 | `filesComplete`, `changedFiles` | `true`, vollständige Liste von 1 bis 200 Dateien über alle API-Seiten |
 | `checks` | Exakt die konfigurierte, nichtleere Menge; keine fehlenden, doppelten oder unbekannten Checks |
 | `notification` | Bestätigte Antwort für genau diese PR-ID und SHA mit nichtleerem Beleg |
+
+`policy.baseBranch` ist zwingend: gültiger Git-Branch-Name (1–255 Zeichen, keine `..`, keine Steuerzeichen). Snapshot-`baseBranch` muss identisch sein.
 
 Jede Datei ist `{status,path}` mit `status` aus `added`, `modified`, `removed`, `renamed`; bei Rename ist zusätzlich `previousPath` zwingend. POSIX-relative Pfade, keine Traversierung, Laufwerke, Backslashes, Prozentcodierung, leeren Komponenten oder Steuerzeichen. **Zielpfad und alter Rename-Pfad müssen exakt und einschließlich Groß-/Kleinschreibung in `policy.allowedPaths` stehen.** Ein Verzeichniseintrag erlaubt keine Unterdateien. Fehlende, leere, doppelte, überlange, unsichere oder als Glob formulierte Listen blockieren die Policy.
 
