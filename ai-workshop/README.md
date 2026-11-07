@@ -16,6 +16,7 @@ const policy = {
   repository: 'pollography/test', allowedRepositories: ['pollography/test'],
   allowedPaths: ['src/counter.js', 'src/new.js', 'src/old.js'],
   requiredChecks: ['test', 'lint'],
+  baseBranch: 'main',
 };
 const result = normalizeSlackEvent({
   type: 'event_callback', team_id: 'TDEMO0001',
@@ -42,11 +43,14 @@ Normalisiertes Event: `source`, `idempotencyKey`, `teamId`, `channelId`, `actorI
 | --- | --- |
 | `repository`, `headRepository` | Exakter Allowlist-Treffer; im Pilot gleicher Quell-/Ziel-Owner und Repository, keine Forks |
 | `pullRequestNumber`, `state` | Positive sichere Integer-ID, Zustand `open` |
+| `baseBranch` | Muss exakt `policy.baseBranch` entsprechen; fehlend, ungültig oder abweichend blockiert |
 | `draft`, `conflicts`, `veto`, `changeRequested` | Alle explizit `false`; fehlend oder unbekannt blockiert |
 | `headSha`, `testedHeadSha`, `headUpdatedAtMs` | Identische volle 40-stellige kleingeschriebene SHA; Zeit des aktuellen Heads |
 | `filesComplete`, `changedFiles` | `true`, vollständige Liste von 1 bis 200 Dateien über alle API-Seiten |
 | `checks` | Exakt die konfigurierte, nichtleere Menge; keine fehlenden, doppelten oder unbekannten Checks |
 | `notification` | Bestätigte Antwort für genau diese PR-ID und SHA mit nichtleerem Beleg |
+
+`policy.baseBranch` ist zwingend: konservativ geprüfter Git-Branch-Name (1–255 UTF-8-Bytes, keine `..` oder Steuerzeichen, keine leeren, mit Punkt beginnenden oder auf `.lock` endenden Pfadkomponenten). Snapshot-`baseBranch` muss identisch sein.
 
 Jede Datei ist `{status,path}` mit `status` aus `added`, `modified`, `removed`, `renamed`; bei Rename ist zusätzlich `previousPath` zwingend. POSIX-relative Pfade, keine Traversierung, Laufwerke, Backslashes, Prozentcodierung, leeren Komponenten oder Steuerzeichen. **Zielpfad und alter Rename-Pfad müssen exakt und einschließlich Groß-/Kleinschreibung in `policy.allowedPaths` stehen.** Ein Verzeichniseintrag erlaubt keine Unterdateien. Fehlende, leere, doppelte, überlange, unsichere oder als Glob formulierte Listen blockieren die Policy.
 
@@ -81,3 +85,4 @@ Weder Blacklist noch reine Funktion können semantisch alle Sicherheitsänderung
 Dieser reine Prädikatsaufruf kann gefälschte/veraltete Snapshots nicht erkennen, keine GitHub-Berechtigungen durchsetzen und keine Race Condition zwischen Lesen und Merge beseitigen. Die fehlenden Adapter müssen Checkherkunft, Vetoquelle, Pagination, Aktualität, Serverregeln und erwartete SHA absichern. Externe Fehler oder Zeitüberschreitungen dürfen nie in synthetische Erfolgswerte umgewandelt werden.
 
 Lokale Abnahme: `node:test` deckt Normalfall, Duplikate/Threads, Fehl-/Missbrauchseingaben, exakte Stundengrenze, neue SHA/Rebase, unbekannte Checks, Notification-Fehler, Zeitwerte, die exakte Pfad-Allowlist samt Rename-Seiten und harte Ausschlüsse trotz versehentlicher Freigabe ab. Kein End-to-End-Dienstlauf durchgeführt. GUI und Produktionsbuild sind für diese ESM-Bibliothek ohne Dienste N/A. Unabhängiger DeepSeek-Review ist wegen Provider-HTTP429/Overload **UNKNOWN**; Lead-Codeprüfung durchgeführt; unabhängig geprüfte Dienstintegration weiterhin ausstehend.
+

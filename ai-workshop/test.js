@@ -11,6 +11,7 @@ const POLICY = {
   repository: 'pollography/test', allowedRepositories: ['pollography/test'],
   allowedPaths: ['src/counter.js', 'src/new.js', 'src/old.js'],
   requiredChecks: ['test', 'lint'],
+  baseBranch: 'main',
 };
 const event = () => ({ type: 'event_callback', team_id: 'TDEMO0001', event_id: 'EvDemo', event: {
   type: 'message', channel: 'CDEMO0001', user: 'UDEMO0001', ts: '1699999999.123456',
@@ -19,6 +20,7 @@ const event = () => ({ type: 'event_callback', team_id: 'TDEMO0001', event_id: '
 const snapshot = () => ({
   repository: 'pollography/test', headRepository: 'pollography/test', pullRequestNumber: 7,
   state: 'open', draft: false, conflicts: false, veto: false, changeRequested: false,
+  baseBranch: 'main',
   headSha: SHA, testedHeadSha: SHA, headUpdatedAtMs: NOW - 4 * MERGE_DELAY_MS,
   filesComplete: true, changedFiles: [{ status: 'modified', path: 'src/counter.js' }],
   checks: [
@@ -139,6 +141,40 @@ test('missing/broken source and policy inputs fail closed without throwing', () 
     { ...POLICY, teamId: 'TDEMO0001\n' },
     { ...POLICY, repository: 'pollography/test\n', allowedRepositories: ['pollography/test\n'] }]) {
     assert.equal(normalizeSlackEvent(event(), policy, NOW).ok, false);
+  }
+});
+
+test('merge requires an exact baseBranch match between policy and snapshot', () => {
+  const input = snapshot();
+  assert.equal(mergeEligibility(input, POLICY, NOW).eligible, true);
+  input.baseBranch = 'unexpected-target';
+  assert.deepEqual(mergeEligibility(input, POLICY, NOW), { eligible: false, reason: 'base_branch_mismatch' });
+  input.baseBranch = 'main';
+  assert.equal(mergeEligibility(input, { ...POLICY, baseBranch: 'release' }, NOW).reason, 'base_branch_mismatch');
+});
+
+for (const [label, mutate, reason] of [
+  ['missing snapshot baseBranch', input => { delete input.baseBranch; }, 'missing_base_branch'],
+  ['empty snapshot baseBranch', input => { input.baseBranch = ''; }, 'invalid_base_branch'],
+  ['snapshot baseBranch with traversal', input => { input.baseBranch = 'feat/../main'; }, 'invalid_base_branch'],
+  ['snapshot baseBranch with newline', input => { input.baseBranch = 'main\n'; }, 'invalid_base_branch'],
+]) {
+  test(`merge blocks ${label}`, () => {
+    const input = snapshot(); mutate(input);
+    assert.deepEqual(mergeEligibility(input, POLICY, NOW), { eligible: false, reason });
+  });
+}
+
+test('invalid or missing policy.baseBranch blocks merge eligibility', () => {
+  for (const baseBranch of [undefined, null, '', ' ', 'main\n', 'feat/../main', 'x'.repeat(256)]) {
+    const policy = { ...POLICY, baseBranch };
+    assert.equal(mergeEligibility(snapshot(), policy, NOW).reason, 'invalid_policy', String(baseBranch));
+  }
+});
+
+test('merge rejects invalid Git ref components even when policy and snapshot agree', () => {
+  for (const baseBranch of ['feature//target', 'feature/.hidden/target', 'feature.lock/target', 'main.lock']) {
+    assert.equal(mergeEligibility({ ...snapshot(), baseBranch }, { ...POLICY, baseBranch }, NOW).reason, 'invalid_policy', baseBranch);
   }
 });
 
@@ -320,7 +356,8 @@ test('broken merge input and policy never imply eligibility', () => {
   for (const policy of [undefined, null, {}, { ...POLICY, requiredChecks: [] },
     { ...POLICY, requiredChecks: ['test', 'test'] }, { ...POLICY, requiredChecks: [''] },
     { ...POLICY, requiredChecks: [' '] }, { ...POLICY, requiredChecks: Array(1) },
-    { ...POLICY, allowedRepositories: [] }, { ...POLICY, allowedRepositories: ['../repo'] }]) {
+    { ...POLICY, allowedRepositories: [] }, { ...POLICY, allowedRepositories: ['../repo'] },
+    { ...POLICY, baseBranch: undefined }, { ...POLICY, baseBranch: 'main\n' }]) {
     assert.equal(mergeEligibility(snapshot(), policy, NOW).eligible, false);
   }
 });
@@ -334,3 +371,4 @@ test('both functions leave caller data unchanged and do not consult wall-clock s
   assert.deepEqual(first, second);
   assert.deepEqual([inputEvent, inputSnapshot, POLICY], originals);
 });
+
