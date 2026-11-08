@@ -40,6 +40,12 @@ and separate enforced branch checks must require `Pilot tests` and the App's
 `AI one-hour gate`. App administration is read-only; it cannot rewrite these rules.
 App installation is only for this sandbox. No App or rule has been activated by
 the local packaging/test step.
+Reuse an existing suitably scoped dedicated App after verifying its real
+installation and permissions; this package does not require creating a duplicate.
+The installation token requests only checks/contents write and
+administration/pull-requests read. Receipt/comments and Actions provenance stay
+on the ordinary read-only workflow token; the App token needs neither issues
+nor Actions access for this controller.
 
 Setup and first real use are **not accepted yet**: App access approval/install,
 main bootstrap review, rule/token verification under the real identity, direct

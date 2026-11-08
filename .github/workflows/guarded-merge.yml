@@ -72,8 +72,6 @@ jobs:
           permission-contents: write
           permission-administration: read
           permission-pull-requests: read
-          permission-issues: read
-          permission-actions: read
       - run: node merge-controller.mjs merge
         env:
           GITHUB_TOKEN: ${{ github.token }}
