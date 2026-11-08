@@ -48,7 +48,7 @@ backflow are required. Existing DraftPR3 changes workflow/security setup and is
 not an automatically eligible feature PR. A controller test success is not
 permission to merge that setup PR.
 
-The package includes 107 controller/policy tests and three separate behavior
+The package includes 114 controller/policy tests and three separate behavior
 tests importing `src/counter.js`. The bounded counter is explicitly a synthetic
 fixture for the public sandbox's one-hour acceptance run, not a real product
 fix or substitute for the Candler cloud-workflow acceptance. Its behavior tests
@@ -59,10 +59,16 @@ file. Local passes do not prove the protected baseline is installed on main;
 that installation and live feature CI still need verification before activation.
 
 The merge API uses an expected head SHA and exactly one mutation attempt.
-A lost response triggers one state read; an observed merge with no successful
-write response has unknown attribution. It is never blindly retried. Metadata
-and comment checks are not transactionally atomic with GitHub's merge API; a tiny
-concurrent-edit race remains and must be represented in acceptance limits.
+Up to three read-only queries reconcile the result, with one-second pauses only
+while the same target still appears open. A denied read or conflicting/terminal
+state stops reconciliation. An observed merge with no successful write response
+has unknown attribution. The merge mutation is never blindly retried.
+After publishing the gate, at most six read-only PR queries (one-second pauses)
+wait for GitHub's aggregate mergeability to include the completed required check.
+Changed base/head/state or continued blocking aborts without a merge request.
+The full receipt/check/review/veto snapshot is collected again after this wait.
+Metadata and comment checks are not transactionally atomic with GitHub's merge
+API; a concurrent-edit race remains and must be represented in acceptance limits.
 
 Packaging reuses the already tested `ai-workshop/index.js` decision core unchanged.
 No runtime packages are installed. Local controller source differs only in its

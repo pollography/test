@@ -59,7 +59,7 @@ export async function collect(api,policy,prNumber,expectedSha,receiptId) {
 
 export const decide=(snapshot,policy,now)=>mergeEligibility(snapshot,policy,now);
 
-export async function run(api,policy,{pr,sha,receipt,now,apply=false,gateApi=null}) {
+export async function run(api,policy,{pr,sha,receipt,now,apply=false,gateApi=null,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}) {
   const snapshot=await collect(api,policy,pr,sha,receipt);
   const decision=decide(snapshot,policy,now);
   if(!apply||!decision.eligible)return {...decision,applied:false};
@@ -81,11 +81,31 @@ export async function run(api,policy,{pr,sha,receipt,now,apply=false,gateApi=nul
   if(!fresh.eligible)fail(`pre_merge_drift:${fresh.reason}`);
   const gate=await gateApi('POST','/check-runs',{name:'AI one-hour gate',head_sha:sha,status:'completed',conclusion:'success',completed_at:new Date(now).toISOString(),output:{title:'One-hour controller checks passed',summary:'Exact head, approved paths, trusted checks, confirmed notification age, current reviews and veto state checked.'}});
   if(gate.app?.id!==policy.gateAppId||gate.head_sha!==sha||gate.name!=='AI one-hour gate'||gate.conclusion!=='success')fail('gate_publication_not_verified');
+  // Publishing a completed check and GitHub indexing it are not atomic. Read the
+  // aggregate state before the one merge attempt; never retry a rejected PUT.
+  let mergeReady=false;
+  for(let attempt=0;attempt<6;attempt++){
+    const current=await gateApi('GET',`/pulls/${pr}`);
+    if(current.head?.sha!==sha||current.base?.repo?.full_name!==policy.repository||current.base?.ref!=='main'||current.state!=='open'||current.draft!==false||current.mergeable===false)fail('merge_readiness_drift');
+    if(current.mergeable===true&&current.mergeable_state==='clean'){mergeReady=true;break;}
+    if(attempt<5)await pause(1000);
+  }
+  if(!mergeReady)fail('gate_not_yet_mergeable');
+  const final=decide(await collect(api,policy,pr,sha,receipt),policy,now);
+  if(!final.eligible)fail(`pre_merge_drift:${final.reason}`);
   // One attempt only. A timeout has an uncertain outcome, not retry permission.
   let result,error;
   try{result=await gateApi('PUT',`/pulls/${pr}/merge`,{sha,merge_method:'squash'});}catch(e){error=e;}
-  const observed=await api('GET',`/pulls/${pr}`);
-  if(observed.merged===true&&observed.head?.sha===sha&&observed.base?.repo?.full_name===policy.repository&&observed.base?.ref==='main'&&observed.state==='closed'&&SHA.test(observed.merge_commit_sha??'')&&(!result?.sha||observed.merge_commit_sha===result.sha))return {...decision,applied:result?.merged===true?true:null,merged:true,outcome:result?.merged===true?'merged_and_reconciled':'observed_merged_writer_unknown',mergeSha:observed.merge_commit_sha};
+  // A successful write may precede the aggregate readback. Only reads repeat;
+  // denied reads or conflicting/terminal state stop reconciliation immediately.
+  for(let attempt=0;attempt<3;attempt++){
+    let observed;
+    try{observed=await api('GET',`/pulls/${pr}`);}catch{break;}
+    const sameTarget=observed.head?.sha===sha&&observed.base?.repo?.full_name===policy.repository&&observed.base?.ref==='main';
+    if(sameTarget&&observed.merged===true&&observed.state==='closed'&&SHA.test(observed.merge_commit_sha??'')&&(!result?.sha||observed.merge_commit_sha===result.sha))return {...final,applied:result?.merged===true?true:null,merged:true,outcome:result?.merged===true?'merged_and_reconciled':'observed_merged_writer_unknown',mergeSha:observed.merge_commit_sha};
+    if(!sameTarget||observed.state!=='open'||observed.merged===true)break;
+    if(attempt<2)await pause(1000);
+  }
   if(error)fail('merge_outcome_unknown_do_not_retry');
   fail(result?.merged===true?'merge_not_reconciled':'merge_rejected');
 }

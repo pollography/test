@@ -30,6 +30,54 @@ test('real API shape supplies an eligible exact-head snapshot',async()=>{const f
 test('one millisecond early cannot merge',async()=>{const f=fixture();const result=await run(f.api,policy,{pr:7,sha:SHA,receipt:90,now:NOW-1,apply:true,gateApi:f.gateApi});assert.equal(result.eligible,false);assert.equal(f.calls.some(c=>c.method==='PUT'),false);});
 test('dry run never writes even when eligible',async()=>{const f=fixture();const result=await run(f.api,policy,{pr:7,sha:SHA,receipt:90,now:NOW,apply:false});assert.equal(result.eligible,true);assert.equal(f.calls.some(c=>c.method==='PUT'),false);});
 test('merge uses expected SHA and reconciles state',async()=>{const f=fixture();const result=await run(f.api,policy,{pr:7,sha:SHA,receipt:90,now:NOW,apply:true,gateApi:f.gateApi});assert.equal(result.merged,true);assert.deepEqual(f.calls.find(c=>c.method==='PUT').body,{sha:SHA,merge_method:'squash'});});
+test('waits for published required check to make the PR mergeable before one PUT',async()=>{
+  const f=fixture();let reads=0,writes=0;
+  const gateApi=async(method,path,body)=>{
+    if(method==='GET'&&path==='/pulls/7'){reads++;const pr=await f.api(method,path,body);return {...pr,mergeable_state:reads<3?'blocked':'clean'};}
+    if(method==='PUT'){writes++;if(reads<3)throw Error('required check is not indexed');}
+    return f.gateApi(method,path,body);
+  };
+  const result=await run(f.api,policy,{pr:7,sha:SHA,receipt:90,now:NOW,apply:true,gateApi,pause:async()=>{}});
+  assert.equal(result.merged,true);assert.equal(reads,3);assert.equal(writes,1);
+});
+test('pending required-check indexing stops after bounded reads without merge',async()=>{
+  const f=fixture();let reads=0;
+  const gateApi=async(method,path,body)=>{if(method==='GET'&&path==='/pulls/7'){reads++;return {...f.data['/pulls/7'],mergeable_state:'blocked'};}return f.gateApi(method,path,body);};
+  await assert.rejects(run(f.api,policy,{pr:7,sha:SHA,receipt:90,now:NOW,apply:true,gateApi,pause:async()=>{}}),/gate_not_yet_mergeable/);
+  assert.equal(reads,6);assert.equal(f.calls.some(c=>c.method==='PUT'),false);
+});
+test('base change during check-index reconciliation cannot merge',async()=>{
+  const f=fixture();const gateApi=async(method,path,body)=>{if(method==='GET'&&path==='/pulls/7')return {...f.data['/pulls/7'],base:{ref:'other',repo:{full_name:policy.repository}}};return f.gateApi(method,path,body);};
+  await assert.rejects(run(f.api,policy,{pr:7,sha:SHA,receipt:90,now:NOW,apply:true,gateApi,pause:async()=>{}}),/merge_readiness_drift/);
+  assert.equal(f.calls.some(c=>c.method==='PUT'),false);
+});
+test('veto arriving during check-index reconciliation is recollected',async()=>{
+  const f=fixture();const gateApi=async(method,path,body)=>{if(method==='GET'&&path==='/pulls/7'){f.data['/issues/7/comments?per_page=100&page=1'].push({user:{login:'pollography'},body:'!ai-veto'});return f.api(method,path,body);}return f.gateApi(method,path,body);};
+  await assert.rejects(run(f.api,policy,{pr:7,sha:SHA,receipt:90,now:NOW,apply:true,gateApi,pause:async()=>{}}),/pre_merge_drift:pr_state_blocks/);
+  assert.equal(f.calls.some(c=>c.method==='PUT'),false);
+});
+test('successful merge waits through stale aggregate reads without a second PUT',async()=>{
+  const f=fixture();let attempted=false,reads=0,writes=0;
+  const stale=structuredClone(f.data['/pulls/7']);
+  const api=async(method,path,body)=>{if(attempted&&method==='GET'&&path==='/pulls/7'&&++reads<3)return stale;return f.api(method,path,body);};
+  const gateApi=async(method,path,body)=>{const result=await f.gateApi(method,path,body);if(method==='PUT'){attempted=true;writes++;}return result;};
+  const result=await run(api,policy,{pr:7,sha:SHA,receipt:90,now:NOW,apply:true,gateApi,pause:async()=>{}});
+  assert.equal(result.applied,true);assert.equal(result.merged,true);assert.equal(reads,3);assert.equal(writes,1);
+});
+test('permanently stale merge readback is bounded and remains unreconciled',async()=>{
+  const f=fixture();let attempted=false,reads=0,writes=0;const stale=structuredClone(f.data['/pulls/7']);
+  const api=async(method,path,body)=>{if(attempted&&method==='GET'&&path==='/pulls/7'){reads++;return stale;}return f.api(method,path,body);};
+  const gateApi=async(method,path,body)=>{const result=await f.gateApi(method,path,body);if(method==='PUT'){attempted=true;writes++;}return result;};
+  await assert.rejects(run(api,policy,{pr:7,sha:SHA,receipt:90,now:NOW,apply:true,gateApi,pause:async()=>{}}),/merge_not_reconciled/);
+  assert.equal(reads,3);assert.equal(writes,1);
+});
+test('readback permission failure does not repeat reads or the merge',async()=>{
+  const f=fixture();let attempted=false,reads=0,writes=0;
+  const api=async(method,path,body)=>{if(attempted&&method==='GET'&&path==='/pulls/7'){reads++;throw Error('github_http_403');}return f.api(method,path,body);};
+  const gateApi=async(method,path,body)=>{const result=await f.gateApi(method,path,body);if(method==='PUT'){attempted=true;writes++;}return result;};
+  await assert.rejects(run(api,policy,{pr:7,sha:SHA,receipt:90,now:NOW,apply:true,gateApi,pause:async()=>{}}),/merge_not_reconciled/);
+  assert.equal(reads,1);assert.equal(writes,1);
+});
 for(const [name,mutate] of [
  ['new head',f=>f.data['/pulls/7'].head.sha='d'.repeat(40)],
  ['fork',f=>f.data['/pulls/7'].head.repo.full_name='evil/test'],
