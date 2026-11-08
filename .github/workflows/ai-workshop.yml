@@ -1,40 +1,24 @@
 name: AI workshop checks
-
 on:
   pull_request:
-    paths:
-      - 'ai-workshop/**'
-      - '.github/workflows/ai-workshop.yml'
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: ai-workshop-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
 jobs:
   test:
     name: Pilot tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    defaults:
-      run:
-        working-directory: ai-workshop
     steps:
-      - name: Check out the exact proposed commit
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Set up Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: '24'
-      - name: Check syntax
-        run: |
-          node --check index.js
-          node --check test.js
-      - name: Run the dependency-free contract tests
-        run: npm test
+      - name: Run dependency-free core and controller tests
+        run: node --test

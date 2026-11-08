@@ -1,0 +1,84 @@
+name: Guarded one-hour merge
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Existing sandbox PR number
+        required: true
+        type: string
+      expected_sha:
+        description: Exact tested full head SHA
+        required: true
+        type: string
+      receipt_comment:
+        description: Owner attestation comment ID after confirmed notification
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: guarded-merge-${{ inputs.pull_request }}
+  cancel-in-progress: false
+jobs:
+  preflight:
+    if: github.repository == 'pollography/test' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      checks: read
+      actions: read
+    outputs:
+      sha: ${{ steps.validate.outputs.validated_sha }}
+      pr: ${{ steps.validate.outputs.validated_pr }}
+      receipt: ${{ steps.validate.outputs.validated_receipt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - id: validate
+        run: node merge-controller.mjs preflight
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pull_request }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          RECEIPT_COMMENT_ID: ${{ inputs.receipt_comment }}
+  merge:
+    needs: preflight
+    environment: ai-merge-1h
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      checks: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - id: identity
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ vars.MERGE_GATE_APP_ID }}
+          private-key: ${{ secrets.MERGE_GATE_PRIVATE_KEY }}
+          owner: pollography
+          repositories: test
+          permission-checks: write
+          permission-contents: write
+          permission-administration: read
+          permission-pull-requests: read
+          permission-issues: read
+          permission-actions: read
+      - run: node merge-controller.mjs merge
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.preflight.outputs.pr }}
+          EXPECTED_SHA: ${{ needs.preflight.outputs.sha }}
+          RECEIPT_COMMENT_ID: ${{ needs.preflight.outputs.receipt }}
+          MERGE_GATE_APP_ID: ${{ vars.MERGE_GATE_APP_ID }}
+          MERGE_GATE_APP_TOKEN: ${{ steps.identity.outputs.token }}
