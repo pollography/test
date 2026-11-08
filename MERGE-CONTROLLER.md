@@ -48,13 +48,15 @@ backflow are required. Existing DraftPR3 changes workflow/security setup and is
 not an automatically eligible feature PR. A controller test success is not
 permission to merge that setup PR.
 
-The 107 included tests cover the controller and policy, not counter behavior.
-This package contains no `src/counter.js` or protected counter behavior test yet.
-CI rejects syntax-broken counter code or a counter file without
-`src/counter.test.js`; presence of a test file alone is not proof of useful
-behavior coverage. A reviewed, protected counter test baseline must be installed
-and verified before activating this feature allowlist. Until then there is no
-accepted normal feature-merge path, even if all controller tests pass.
+The package includes 107 controller/policy tests and three separate behavior
+tests importing `src/counter.js`. The bounded counter is explicitly a synthetic
+fixture for the public sandbox's one-hour acceptance run, not a real product
+fix or substitute for the Candler cloud-workflow acceptance. Its behavior tests
+cover increment/decrement, both clamps and invalid values/changes. The fixture
+tests are excluded from automatic-change permissions and need the reviewed
+manual bootstrap. CI also rejects syntax-broken counter code or a missing test
+file. Local passes do not prove the protected baseline is installed on main;
+that installation and live feature CI still need verification before activation.
 
 The merge API uses an expected head SHA and exactly one mutation attempt.
 A lost response triggers one state read; an observed merge with no successful
