@@ -48,6 +48,14 @@ backflow are required. Existing DraftPR3 changes workflow/security setup and is
 not an automatically eligible feature PR. A controller test success is not
 permission to merge that setup PR.
 
+The 107 included tests cover the controller and policy, not counter behavior.
+This package contains no `src/counter.js` or protected counter behavior test yet.
+CI rejects syntax-broken counter code or a counter file without
+`src/counter.test.js`; presence of a test file alone is not proof of useful
+behavior coverage. A reviewed, protected counter test baseline must be installed
+and verified before activating this feature allowlist. Until then there is no
+accepted normal feature-merge path, even if all controller tests pass.
+
 The merge API uses an expected head SHA and exactly one mutation attempt.
 A lost response triggers one state read; an observed merge with no successful
 write response has unknown attribution. It is never blindly retried. Metadata
