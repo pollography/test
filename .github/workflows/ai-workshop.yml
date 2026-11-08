@@ -1,0 +1,30 @@
+name: AI workshop checks
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ai-workshop-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    name: Pilot tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - name: Run dependency-free core and controller tests
+        run: node --test
+      - name: Reject unvalidated feature code
+        run: |
+          if [ -f src/counter.js ]; then
+            node --check src/counter.js
+            test -f src/counter.test.js || { echo 'Protected counter behavior tests are required before feature merges'; exit 1; }
+          fi

@@ -1,0 +1,14 @@
+{
+  "name": "cloud-loop-pilot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline validation and merge eligibility for an explicitly configured Slack-to-PR pilot.",
+  "exports": "./index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
